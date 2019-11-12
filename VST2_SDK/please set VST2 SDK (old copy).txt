@@ -1,0 +1,12 @@
+..\VST2_SDK\pluginterfaces\vst2.x
+aeffect.h
+aeffectx.h
+vstfxstore.h
+
+..\VST2_SDK\public.sdk\source\vst2.x
+aeffeditor.h
+audioeffect.cpp
+audioeffect.h
+audioeffectx.cpp
+audioeffectx.h
+vstplugmain.cpp

@@ -1,149 +1,148 @@
 #ifndef _EMU2413_H_
 #define _EMU2413_H_
 
-#include "emutypes.h"
-
-#ifdef EMU2413_DLL_EXPORTS
-  #define EMU2413_API __declspec(dllexport)
-#elif defined(EMU2413_DLL_IMPORTS)
-  #define EMU2413_API __declspec(dllimport)
-#else
-  #define EMU2413_API
-#endif
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define PI 3.14159265358979323846
+typedef enum __OPLL_EG_STATE { ATTACK, DECAY, SUSTAIN, RELEASE, DAMP } OPLL_EG_STATE;
 
-enum OPLL_TONE_ENUM {OPLL_2413_TONE=0, OPLL_VRC7_TONE=1, OPLL_281B_TONE=2} ;
+enum OPLL_TONE_ENUM { OPLL_2413_TONE = 0, OPLL_VRC7_TONE = 1, OPLL_281B_TONE = 2 };
 
 /* voice data */
 typedef struct __OPLL_PATCH {
-  e_uint32 TL,FB,EG,ML,AR,DR,SL,RR,KR,KL,AM,PM,WF ;
-} OPLL_PATCH ;
+  uint32_t TL, FB, EG, ML, AR, DR, SL, RR, KR, KL, AM, PM, WF;
+} OPLL_PATCH;
 
 /* slot */
 typedef struct __OPLL_SLOT {
+  uint8_t number;
+  int32_t type; /* 0:modulator 1:carrier */
 
-  OPLL_PATCH *patch;  
+  OPLL_PATCH *patch; /* voice parameter */
 
-  e_int32 type ;          /* 0 : modulator 1 : carrier */
+  /* slot output */
+  int32_t feedback;  /* amount of feedback */
+  int32_t output[2]; /* output value, latest and previous. */
 
-  /* OUTPUT */
-  e_int32 feedback ;
-  e_int32 output[2] ;   /* Output value of slot */
+  /* phase generator (pg) */
+  uint16_t *wave_table; /* wave table */
+  uint32_t pg_phase;    /* pg phase */
+  uint32_t pg_out;      /* pg output, as index of wave table */
+  uint8_t pg_keep;      /* if 1, pg_phase is preserved when key-on */
+  uint16_t blk_fnum;    /* (block << 9) | f-number */
+  uint16_t fnum;        /* f-number (9 bits) */
+  uint8_t blk;          /* block (3 bits) */
 
-  /* for Phase Generator (PG) */
-  e_uint16 *sintbl ;    /* Wavetable */
-  e_uint32 phase ;      /* Phase */
-  e_uint32 dphase ;     /* Phase increment amount */
-  e_uint32 pgout ;      /* output */
+  /* envelope generator (eg) */
+  uint8_t eg_state;         /* current state */
+  int32_t volume;           /* current volume */
+  uint8_t sus_flag;         /* key-sus option 1:on 0:off */
+  uint16_t tll;             /* total level + key scale level*/
+  uint8_t rks;              /* key scale offset (rks) for eg speed */
+  uint8_t eg_rate_h;        /* eg speed rate high 4bits */
+  uint8_t eg_rate_l;        /* eg speed rate low 2bits */
+  uint32_t eg_shift;        /* shift for eg global counter, controls envelope speed */
+  uint32_t eg_out;          /* eg output */
 
-  /* for Envelope Generator (EG) */
-  e_int32 fnum ;          /* F-Number */
-  e_int32 block ;         /* Block */
-  e_int32 volume ;        /* Current volume */
-  e_int32 sustine ;       /* Sustine 1 = ON, 0 = OFF */
-  e_uint32 tll ;	      /* Total Level + Key scale level*/
-  e_uint32 rks ;        /* Key scale offset (Rks) */
-  e_int32 eg_mode ;       /* Current state */
-  e_uint32 eg_phase ;   /* Phase */
-  e_uint32 eg_dphase ;  /* Phase increment amount */
-  e_uint32 egout ;      /* output */
+  uint8_t last_eg_state;
 
-} OPLL_SLOT ;
+  uint32_t update_requests; /* flags to debounce update */
+} OPLL_SLOT;
 
-/* Mask */
-#define OPLL_MASK_CH(x) (1<<(x))
-#define OPLL_MASK_HH (1<<(9))
-#define OPLL_MASK_CYM (1<<(10))
-#define OPLL_MASK_TOM (1<<(11))
-#define OPLL_MASK_SD (1<<(12))
-#define OPLL_MASK_BD (1<<(13))
-#define OPLL_MASK_RHYTHM ( OPLL_MASK_HH | OPLL_MASK_CYM | OPLL_MASK_TOM | OPLL_MASK_SD | OPLL_MASK_BD )
+/* mask */
+#define OPLL_MASK_CH(x) (1 << (x))
+#define OPLL_MASK_HH (1 << (9))
+#define OPLL_MASK_CYM (1 << (10))
+#define OPLL_MASK_TOM (1 << (11))
+#define OPLL_MASK_SD (1 << (12))
+#define OPLL_MASK_BD (1 << (13))
+#define OPLL_MASK_RHYTHM (OPLL_MASK_HH | OPLL_MASK_CYM | OPLL_MASK_TOM | OPLL_MASK_SD | OPLL_MASK_BD)
 
 /* opll */
 typedef struct __OPLL {
+  uint32_t clk;
+  uint32_t rate;
 
-  e_uint32 adr ;
-  e_int32 out ;
+  uint8_t chip_mode;
 
-#ifndef EMU2413_COMPACTION
-  e_uint32 realstep ;
-  e_uint32 oplltime ;
-  e_uint32 opllstep ;
-  e_int32 prev, next ;
-  e_int32 sprev[2],snext[2];
-  e_uint32 pan[16];
-#endif
+  uint32_t adr;
+  int32_t out;
 
-  /* Register */
-  e_uint8 reg[0x40] ; 
-  e_int32 slot_on_flag[18] ;
+  uint32_t real_step;
+  uint32_t opll_time;
+  uint32_t opll_step;
 
-  /* Pitch Modulator */
-  e_uint32 pm_phase ;
-  e_int32 lfo_pm ;
+  uint8_t reg[0x40];
+  uint32_t slot_key_status;
+  uint8_t rhythm_mode;
 
-  /* Amp Modulator */
-  e_int32 am_phase ;
-  e_int32 lfo_am ;
+  uint32_t eg_counter; /* global counter for envelope */
 
-  e_uint32 quality;
+  uint32_t pm_phase;
+  uint32_t pm_dphase;
 
-  /* Noise Generator */
-  e_uint32 noise_seed ;
+  int32_t am_phase;
+  int32_t am_dphase;
+  uint8_t lfo_am;
 
-  /* Channel Data */
-  e_int32 patch_number[9];
-  e_int32 key_status[9] ;
+  uint32_t noise_seed;
+  uint8_t noise;
+  uint8_t short_noise;
 
-  /* Slot */
-  OPLL_SLOT slot[18] ;
+  int32_t patch_number[9];
+  OPLL_SLOT slot[18];
+  OPLL_PATCH patch[19 * 2];
+  int32_t patch_update[2]; /* flag for check patch update */
 
-  /* Voice Data */
-  OPLL_PATCH patch[19*2] ;
-  e_int32 patch_update[2] ; /* flag for check patch update */
+  uint32_t pan[16];
+  uint32_t mask;
 
-  e_uint32 mask ;
+  /* output of each channels
+   * 0-8:TONE
+   * 9:BD 10:HH 11:SD, 12:TOM, 13:CYM
+   * 14:reserved for dac
+   */
+  int32_t ch_out[15];
 
-} OPLL ;
+} OPLL;
 
-/* Create Object */
-EMU2413_API OPLL *OPLL_new(e_uint32 clk, e_uint32 rate) ;
-EMU2413_API void OPLL_delete(OPLL *) ;
+OPLL *OPLL_new(uint32_t clk, uint32_t rate);
+void OPLL_delete(OPLL *);
 
-/* Setup */
-EMU2413_API void OPLL_reset(OPLL *) ;
-EMU2413_API void OPLL_reset_patch(OPLL *, e_int32) ;
-EMU2413_API void OPLL_set_rate(OPLL *opll, e_uint32 r) ;
-EMU2413_API void OPLL_set_quality(OPLL *opll, e_uint32 q) ;
-EMU2413_API void OPLL_set_pan(OPLL *, e_uint32 ch, e_uint32 pan);
+void OPLL_reset(OPLL *);
+void OPLL_resetPatch(OPLL *, int32_t);
+void OPLL_setRate(OPLL *opll, uint32_t r);
+void OPLL_setQuality(OPLL *opll, uint8_t q);
+void OPLL_setPan(OPLL *, uint32_t ch, uint32_t pan);
+void OPLL_setChipMode(OPLL *opll, uint8_t mode); /* mode:0 ym2413, mode:1 vrc7 */
 
-/* Port/Register access */
-EMU2413_API void OPLL_writeIO(OPLL *, e_uint32 reg, e_uint32 val) ;
-EMU2413_API void OPLL_writeReg(OPLL *, e_uint32 reg, e_uint32 val) ;
+void OPLL_writeIO(OPLL *, uint32_t reg, uint32_t val);
+void OPLL_writeReg(OPLL *, uint32_t reg, uint32_t val);
 
-/* Synthsize */
-EMU2413_API e_int16 OPLL_calc(OPLL *) ;
-EMU2413_API void OPLL_calc_stereo(OPLL *, e_int32 out[2]) ;
+int16_t OPLL_calc(OPLL *);
+void OPLL_calcStereo(OPLL *, int32_t out[2]);
 
-/* Misc */
-EMU2413_API void OPLL_setPatch(OPLL *, const e_uint8 *dump) ;
-EMU2413_API void OPLL_copyPatch(OPLL *, e_int32, OPLL_PATCH *) ;
-EMU2413_API void OPLL_forceRefresh(OPLL *) ;
-/* Utility */
-EMU2413_API void OPLL_dump2patch(const e_uint8 *dump, OPLL_PATCH *patch) ;
-EMU2413_API void OPLL_patch2dump(const OPLL_PATCH *patch, e_uint8 *dump) ;
-EMU2413_API void OPLL_getDefaultPatch(e_int32 type, e_int32 num, OPLL_PATCH *) ;
+void OPLL_setPatch(OPLL *, const uint8_t *dump);
+void OPLL_copyPatch(OPLL *, int32_t, OPLL_PATCH *);
+void OPLL_forceRefresh(OPLL *);
+void OPLL_dumpToPatch(const uint8_t *dump, OPLL_PATCH *patch);
+void OPLL_patchToDump(const OPLL_PATCH *patch, uint8_t *dump);
+void OPLL_getDefaultPatch(int32_t type, int32_t num, OPLL_PATCH *);
 
-/* Channel Mask */
-EMU2413_API e_uint32 OPLL_setMask(OPLL *, e_uint32 mask) ;
-EMU2413_API e_uint32 OPLL_toggleMask(OPLL *, e_uint32 mask) ;
+uint32_t OPLL_setMask(OPLL *, uint32_t mask);
+uint32_t OPLL_toggleMask(OPLL *, uint32_t mask);
 
-#define dump2patch OPLL_dump2patch
+/* for compatibility */
+#define OPLL_set_rate OPLL_setRate
+#define OPLL_set_quality OPLL_setQuality
+#define OPLL_set_pan OPLL_setPan
+#define OPLL_calc_stereo OPLL_calcStereo
+#define OPLL_reset_patch OPLL_resetPatch
+#define OPLL_dump2patch OPLL_dumpToPatch
+#define OPLL_patch2dump OPLL_patchToDump
 
 #ifdef __cplusplus
 }
